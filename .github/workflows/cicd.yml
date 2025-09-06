@@ -1,0 +1,42 @@
+name: nayimo-project-app01
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Set up JDK
+      uses: actions/setup-java@v3
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+
+    - name: Build with Maven
+      run: mvn clean package -DskipTests
+
+    - name: Upload JAR via SFTP (ID/PW 방식)
+      uses: wangyucode/sftp-upload-action@v1.0.0
+      with:
+        host: ${{ secrets.SERVER_HOST }}
+        port: 22
+        username: ${{ secrets.SERVER_USER }}
+        password: ${{ secrets.SERVER_PASSWORD }}
+        localPath: "target/*.jar"
+        remotePath: "/app"
+
+    - name: Restart Spring Boot App via SSH
+      uses: appleboy/ssh-action@v0.1.7
+      with:
+        host: ${{ secrets.SERVER_HOST }}
+        username: ${{ secrets.SERVER_USER }}
+        password: ${{ secrets.SERVER_PASSWORD }}
+        script: |
+          pkill -f 'java -jar' || true
+          nohup java -jar /app/*.jar > app.log 2>&1 &
